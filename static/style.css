@@ -39,6 +39,18 @@ header .subtitle {
   font-size: 0.85rem;
 }
 
+.github-link {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.github-link:hover { color: var(--text); }
+
 .layout {
   display: grid;
   grid-template-columns: 340px 1fr 1fr;
@@ -88,6 +100,12 @@ header .subtitle {
   flex-shrink: 0;
   padding: 12px;
   border-top: 1px solid var(--border);
+}
+
+.profile-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 /* --- Upload zone --- */

@@ -3,14 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SVG to G-code - MPCNC Pen Plotter</title>
+  <title>PlotForge - SVG to G-code</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
 <header>
-  <h1>SVG &rarr; G-code</h1>
-  <span class="subtitle">MPCNC Pen Plotter</span>
+  <h1>PlotForge</h1>
+  <span class="subtitle">SVG &rarr; G-code generator</span>
+  <a class="github-link" href="https://github.com/Xqua/Plotforge" target="_blank" rel="noopener">
+    <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    <img alt="GitHub stars" src="https://img.shields.io/github/stars/Xqua/Plotforge?style=flat&color=e94560&labelColor=1a1a2e">
+  </a>
 </header>
 
 <div class="layout">
@@ -42,6 +46,13 @@
               <select id="profile-select">
                 <option value="">-- Custom --</option>
               </select>
+            </div>
+            <div class="profile-actions">
+              <button class="btn btn-sm btn-ghost" id="btn-save-profile" title="Save current settings as a profile">Save</button>
+              <button class="btn btn-sm btn-ghost" id="btn-delete-profile" title="Delete saved profile">Delete</button>
+              <button class="btn btn-sm btn-ghost" id="btn-export-profile" title="Export current settings as TOML">Export</button>
+              <button class="btn btn-sm btn-ghost" id="btn-import-profile" title="Import a TOML profile">Import</button>
+              <input type="file" id="profile-file-input" accept=".toml,.txt" hidden>
             </div>
             <div id="profile-info" style="font-size:0.78rem;color:var(--text-dim);padding:4px 0;"></div>
           </div>
@@ -251,6 +262,42 @@
         </div>
       </div>
 
+      <!-- CNCjs Integration -->
+      <div class="accordion-section">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          CNCjs Connection
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="field">
+              <label>CNCjs Host</label>
+              <input type="text" id="cncjs-host" value="localhost" placeholder="localhost or IP">
+            </div>
+            <div class="field">
+              <label>CNCjs Port</label>
+              <input type="number" id="cncjs-port" value="8000">
+            </div>
+            <div class="field">
+              <label>Username (leave blank if no auth)</label>
+              <input type="text" id="cncjs-user" placeholder="admin">
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input type="password" id="cncjs-pass" placeholder="">
+            </div>
+            <div class="field">
+              <label>Serial Port</label>
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="cncjs-serial" placeholder="/dev/ttyUSB0" style="flex:1;">
+                <button class="btn btn-sm btn-ghost" id="btn-cncjs-detect" title="Detect connected controllers">Detect</button>
+              </div>
+            </div>
+            <div id="cncjs-status" style="font-size:0.78rem;color:var(--text-dim);padding:4px 0;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Template Variables Reference -->
       <div class="accordion-section">
         <div class="accordion-header" onclick="toggleAccordion(this)">
@@ -313,6 +360,7 @@
       <div>
         <button class="btn btn-sm btn-ghost" id="btn-copy-gcode">Copy</button>
         <button class="btn btn-sm btn-ghost" id="btn-download-gcode">Download .gcode</button>
+        <button class="btn btn-sm" id="btn-send-cncjs" style="background:var(--accent2);color:var(--text);" title="Send G-code to CNCjs">Send to CNCjs</button>
       </div>
     </div>
     <div class="panel-body" style="padding:0;">

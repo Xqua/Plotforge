@@ -14,37 +14,101 @@ const profileSelect = document.getElementById("profile-select");
 const profileInfo = document.getElementById("profile-info");
 const templateVarsRef = document.getElementById("template-vars-ref");
 
+// ---- Local storage for user profiles ----
+
+const USER_PROFILES_KEY = "plotforge-user-profiles";
+
+function loadUserProfiles() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_PROFILES_KEY)) || {};
+  } catch { return {}; }
+}
+
+function saveUserProfiles(profiles) {
+  localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+}
+
+function addUserProfile(name, data) {
+  const saved = loadUserProfiles();
+  saved[name] = data;
+  saveUserProfiles(saved);
+}
+
+function deleteUserProfile(name) {
+  const saved = loadUserProfiles();
+  delete saved[name];
+  saveUserProfiles(saved);
+}
+
 // ---- Profile loading ----
+
+state.userProfileNames = new Set();
 
 export async function loadProfiles() {
   try {
     const resp = await fetch("/api/profiles");
     state.profiles = await resp.json();
-    profileSelect.innerHTML = '<option value="">-- Custom --</option>';
 
-    const names = Object.keys(state.profiles).sort((a, b) => {
-      if (a === "mpcnc") return -1;
-      if (b === "mpcnc") return 1;
-      return a.localeCompare(b);
-    });
+    // Merge saved user profiles
+    const userProfiles = loadUserProfiles();
+    for (const [name, data] of Object.entries(userProfiles)) {
+      state.profiles[name] = data;
+      state.userProfileNames.add(name);
+    }
 
-    for (const name of names) {
+    rebuildProfileDropdown();
+
+    if (state.profiles["mpcnc"]) {
+      profileSelect.value = "mpcnc";
+      applyProfile("mpcnc");
+    } else {
+      const first = profileSelect.options[1];
+      if (first) { profileSelect.value = first.value; applyProfile(first.value); }
+    }
+  } catch (e) {
+    console.error("Failed to load profiles:", e);
+  }
+}
+
+function rebuildProfileDropdown() {
+  const current = profileSelect.value;
+  profileSelect.innerHTML = '<option value="">-- Custom --</option>';
+
+  const bundled = [];
+  const user = [];
+  for (const name of Object.keys(state.profiles)) {
+    (state.userProfileNames.has(name) ? user : bundled).push(name);
+  }
+
+  bundled.sort((a, b) => {
+    if (a === "mpcnc") return -1;
+    if (b === "mpcnc") return 1;
+    return a.localeCompare(b);
+  });
+  user.sort();
+
+  for (const name of bundled) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    profileSelect.appendChild(opt);
+  }
+
+  if (user.length > 0) {
+    const sep = document.createElement("option");
+    sep.disabled = true;
+    sep.textContent = "── Saved profiles ──";
+    profileSelect.appendChild(sep);
+    for (const name of user) {
       const opt = document.createElement("option");
       opt.value = name;
       opt.textContent = name;
       profileSelect.appendChild(opt);
     }
-
-    if (state.profiles["mpcnc"]) {
-      profileSelect.value = "mpcnc";
-      applyProfile("mpcnc");
-    } else if (names.length > 0) {
-      profileSelect.value = names[0];
-      applyProfile(names[0]);
-    }
-  } catch (e) {
-    console.error("Failed to load profiles:", e);
   }
+
+  // Restore selection if still valid
+  if (current && state.profiles[current]) profileSelect.value = current;
 }
 
 profileSelect.addEventListener("change", () => {
@@ -109,6 +173,99 @@ function syncSlidersFromTemplates(cfg) {
     document.getElementById("pen-down-val").textContent = allZ[allZ.length - 1][1];
   }
 }
+
+// ---- Profile import / export ----
+
+const btnExport = document.getElementById("btn-export-profile");
+const btnImport = document.getElementById("btn-import-profile");
+const profileFileInput = document.getElementById("profile-file-input");
+
+btnExport.addEventListener("click", () => {
+  const settings = gatherSettings();
+  const name = profileSelect.value || "custom";
+
+  let toml = `[gwrite.${name}]\n`;
+  for (const key of TEMPLATE_FIELDS) {
+    const val = settings[key];
+    if (val) toml += `${key} = "${val.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"\n`;
+  }
+  for (const key of TRANSFORM_FIELDS) {
+    const val = settings[key];
+    if (val !== undefined && val !== null && val !== "") {
+      toml += typeof val === "string" ? `${key} = "${val}"\n` : `${key} = ${val}\n`;
+    }
+  }
+  for (const key of BOOL_FIELDS) {
+    if (settings[key] !== undefined) toml += `${key} = ${settings[key]}\n`;
+  }
+
+  const blob = new Blob([toml], { type: "application/toml" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}.toml`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+btnImport.addEventListener("click", () => profileFileInput.click());
+
+profileFileInput.addEventListener("change", async () => {
+  const file = profileFileInput.files[0];
+  if (!file) return;
+  profileFileInput.value = "";
+
+  const form = new FormData();
+  form.append("file", file);
+
+  try {
+    const resp = await fetch("/api/parse-profile", { method: "POST", body: form });
+    const data = await resp.json();
+    if (data.error) { alert(`Failed to parse profile: ${data.error}`); return; }
+
+    const name = file.name.replace(/\.toml$/, "").replace(/\.txt$/, "");
+    state.profiles[name] = data;
+    state.userProfileNames.add(name);
+    addUserProfile(name, data);
+    rebuildProfileDropdown();
+    profileSelect.value = name;
+    applyProfile(name);
+  } catch (e) {
+    alert(`Import failed: ${e.message}`);
+  }
+});
+
+// Save current form as a named user profile
+const btnSave = document.getElementById("btn-save-profile");
+const btnDelete = document.getElementById("btn-delete-profile");
+
+btnSave.addEventListener("click", () => {
+  const defaultName = profileSelect.value || "my-profile";
+  const name = prompt("Profile name:", defaultName);
+  if (!name) return;
+
+  const data = gatherSettings();
+  state.profiles[name] = data;
+  state.userProfileNames.add(name);
+  addUserProfile(name, data);
+  rebuildProfileDropdown();
+  profileSelect.value = name;
+});
+
+btnDelete.addEventListener("click", () => {
+  const name = profileSelect.value;
+  if (!name || !state.userProfileNames.has(name)) {
+    alert("Can only delete saved user profiles.");
+    return;
+  }
+  if (!confirm(`Delete profile "${name}"?`)) return;
+
+  delete state.profiles[name];
+  state.userProfileNames.delete(name);
+  deleteUserProfile(name);
+  rebuildProfileDropdown();
+  profileSelect.value = profileSelect.options[1]?.value || "";
+  if (profileSelect.value) applyProfile(profileSelect.value);
+});
 
 // ---- Template variables reference ----
 

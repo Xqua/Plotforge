@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import io
 import tempfile
+import tomllib
 from pathlib import Path
 
 import vpype as vp
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="SVG to G-code")
+app = FastAPI(title="PlotForge")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -147,6 +148,35 @@ def list_profiles():
 @app.get("/api/template-variables")
 def template_variables():
     return TEMPLATE_VARIABLES_DOCS
+
+
+@app.post("/api/parse-profile")
+async def parse_profile(file: UploadFile = File(...)):
+    """Parse an uploaded TOML profile and return its settings as JSON."""
+    try:
+        raw = await file.read()
+        data = tomllib.loads(raw.decode("utf-8"))
+
+        # Accept both bare keys and [gwrite.name] wrapped profiles
+        profile = data
+        if "gwrite" in data:
+            gwrite = data["gwrite"]
+            # Pick the first (and likely only) profile inside [gwrite]
+            for k, v in gwrite.items():
+                if isinstance(v, dict):
+                    profile = v
+                    break
+
+        result = {}
+        for k in PROFILE_KEYS_TEMPLATES + PROFILE_KEYS_TRANSFORMS:
+            if k in profile:
+                result[k] = profile[k]
+        if "info" in profile:
+            result["info"] = profile["info"]
+
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @app.post("/api/upload-svg")
