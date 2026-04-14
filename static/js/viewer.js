@@ -4,6 +4,7 @@ import { ViewHelper } from "three/addons/helpers/ViewHelper.js";
 
 let scene, camera, renderer, controls;
 let toolpathGroup = null;
+let rulerGroup = null;
 let viewHelper = null;
 const clock = new THREE.Clock();
 
@@ -329,7 +330,134 @@ export function renderGcode(gcode) {
   }
 
   scene.add(toolpathGroup);
+  buildRulers();
   resetCamera();
 
   viewerInfo.textContent = `${totalPoints} points | ${paths.length} segments`;
+}
+
+// =========================================================================
+// Axis rulers with tick marks and labels
+// =========================================================================
+
+function makeTextSprite(text, color = "#999999") {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const fontSize = 48;
+  ctx.font = `${fontSize}px sans-serif`;
+  const width = ctx.measureText(text).width + 8;
+  canvas.width = width;
+  canvas.height = fontSize + 8;
+  // Re-set font after resize
+  ctx.font = `${fontSize}px sans-serif`;
+  ctx.fillStyle = color;
+  ctx.fillText(text, 4, fontSize);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(canvas.width / 8, canvas.height / 8, 1);
+  return sprite;
+}
+
+function buildRulers() {
+  if (rulerGroup) {
+    scene.remove(rulerGroup);
+    rulerGroup.traverse((c) => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) {
+        if (c.material.map) c.material.map.dispose();
+        c.material.dispose();
+      }
+    });
+  }
+
+  rulerGroup = new THREE.Group();
+
+  if (!toolpathGroup) return;
+
+  const box = new THREE.Box3().setFromObject(toolpathGroup);
+  const maxX = Math.ceil(box.max.x);
+  const minY = Math.floor(box.min.y);  // negative because of Y flip
+  const maxY = Math.ceil(box.max.y);
+
+  // Choose a nice tick interval based on extent
+  const extentX = maxX;
+  const extentY = Math.max(Math.abs(minY), Math.abs(maxY));
+  const extent = Math.max(extentX, extentY);
+  let step = 10; // mm
+  if (extent > 500) step = 100;
+  else if (extent > 200) step = 50;
+  else if (extent > 50) step = 10;
+  else step = 5;
+
+  const tickLen = step * 0.15;
+  const tickMat = new THREE.LineBasicMaterial({ color: 0x666688 });
+
+  // X axis ruler (along Y=0 line, below toolpath)
+  const rulerY = 0; // origin
+  for (let x = step; x <= maxX + step; x += step) {
+    // Tick mark
+    const tickGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x, rulerY, 0),
+      new THREE.Vector3(x, rulerY + tickLen, 0),
+    ]);
+    rulerGroup.add(new THREE.Line(tickGeo, tickMat));
+
+    // Label
+    const label = makeTextSprite(`${x}`);
+    label.position.set(x, rulerY + tickLen + 2, 0);
+    rulerGroup.add(label);
+  }
+
+  // X axis line
+  const xLineGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, rulerY, 0),
+    new THREE.Vector3(maxX + step, rulerY, 0),
+  ]);
+  rulerGroup.add(new THREE.Line(xLineGeo, tickMat));
+
+  // Y axis ruler (along X=0 line) — remember Y is negated in viewer
+  const rulerX = 0;
+  const yStart = Math.min(minY, 0);
+  const yEnd = Math.max(maxY, 0);
+  for (let y = yStart; y >= yStart - step; y -= step) {} // not needed
+  for (let y = Math.ceil(yStart / step) * step; y <= yEnd; y += step) {
+    if (y === 0) continue;
+    // Tick mark
+    const tickGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(rulerX, y, 0),
+      new THREE.Vector3(rulerX - tickLen, y, 0),
+    ]);
+    rulerGroup.add(new THREE.Line(tickGeo, tickMat));
+
+    // Label — show positive values since they represent mm from origin
+    const label = makeTextSprite(`${Math.abs(y)}`);
+    label.position.set(rulerX - tickLen - 4, y, 0);
+    rulerGroup.add(label);
+  }
+
+  // Y axis line
+  const yLineGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(rulerX, yStart, 0),
+    new THREE.Vector3(rulerX, yEnd, 0),
+  ]);
+  rulerGroup.add(new THREE.Line(yLineGeo, tickMat));
+
+  // Origin label
+  const originLabel = makeTextSprite("0", "#888888");
+  originLabel.position.set(-3, 2, 0);
+  rulerGroup.add(originLabel);
+
+  // Unit labels
+  const xUnitLabel = makeTextSprite("mm", "#666688");
+  xUnitLabel.position.set(maxX + step + step * 1.2, rulerY + tickLen + 2, 0);
+  rulerGroup.add(xUnitLabel);
+
+  const yUnitLabel = makeTextSprite("mm", "#666688");
+  yUnitLabel.position.set(rulerX - tickLen - 4, yStart - step * 0.5, 0);
+  rulerGroup.add(yUnitLabel);
+
+  scene.add(rulerGroup);
 }
