@@ -318,7 +318,7 @@ export function renderGcode(gcode) {
     for (let i = 0; i < path.points.length; i++) {
       const p = path.points[i];
       positions[i * 3] = p.x;
-      positions[i * 3 + 1] = p.y;
+      positions[i * 3 + 1] = -p.y;  // Negate Y: SVG Y-down → Three.js Y-up
       positions[i * 3 + 2] = p.z;
       totalPoints++;
     }
