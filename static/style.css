@@ -340,6 +340,40 @@ header .subtitle {
   color: var(--text);
 }
 
+/* --- Dialog --- */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 460px;
+  text-align: center;
+}
+
+.dialog h3 {
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.dialog p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.dialog .btn { margin-top: 8px; }
+
 /* --- SVG Preview --- */
 .svg-preview {
   width: 100%;

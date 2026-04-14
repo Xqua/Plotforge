@@ -48,5 +48,24 @@ function showSvgPreview(svg) {
     svgEl.setAttribute("height", "100%");
     svgEl.style.maxWidth = "100%";
     svgEl.style.maxHeight = "100%";
+
+    if (svgEl.querySelectorAll("text").length > 0) {
+      showTextWarning();
+    }
   }
+}
+
+function showTextWarning() {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog">
+      <h3>Warning: SVG contains &lt;text&gt; elements</h3>
+      <p>Text elements cannot be converted to G-code. They will be silently ignored during generation.</p>
+      <p>Please convert all text to paths first (in Inkscape: select text, then <strong>Path &rarr; Object to Path</strong>).</p>
+      <button class="btn btn-primary" id="dialog-dismiss">OK, understood</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("dialog-dismiss").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
 }
