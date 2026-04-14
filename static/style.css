@@ -84,6 +84,12 @@ header .subtitle {
   padding: 0;
 }
 
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* --- Upload zone --- */
 .upload-zone {
   border: 2px dashed var(--border);
