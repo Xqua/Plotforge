@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG to G-code - MPCNC Pen Plotter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>SVG &rarr; G-code</h1>
+  <span class="subtitle">MPCNC Pen Plotter</span>
+</header>
+
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <div class="panel sidebar">
+    <div class="panel-header">
+      Configuration
+    </div>
+    <div class="panel-body">
+
+      <!-- Upload -->
+      <div class="upload-zone" id="upload-zone">
+        <p>Drop SVG here or click to upload</p>
+        <div class="filename" id="upload-filename"></div>
+        <input type="file" id="file-input" accept=".svg" hidden>
+      </div>
+
+      <!-- Profile Preset -->
+      <div class="accordion-section open">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Profile Preset
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="field">
+              <label>Load preset</label>
+              <select id="profile-select">
+                <option value="">-- Custom --</option>
+              </select>
+            </div>
+            <div id="profile-info" style="font-size:0.78rem;color:var(--text-dim);padding:4px 0;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Basic: Feed Rate -->
+      <div class="accordion-section open">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Feed Rate
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="field">
+              <label>Cut feed rate <span class="slider-val" id="feed-cut-val">3000</span> mm/min</label>
+              <input type="range" id="feed-cut" min="100" max="10000" step="100" value="3000" class="slider">
+            </div>
+            <div class="field">
+              <label>Travel feed rate <span class="slider-val" id="feed-travel-val">1000</span> mm/min</label>
+              <input type="range" id="feed-travel" min="100" max="10000" step="100" value="1000" class="slider">
+            </div>
+            <div class="field">
+              <label>Pen-down Z <span class="slider-val" id="pen-down-val">0</span> mm</label>
+              <input type="range" id="pen-down" min="-10" max="20" step="0.5" value="0" class="slider">
+            </div>
+            <div class="field">
+              <label>Pen-up Z <span class="slider-val" id="pen-up-val">5</span> mm</label>
+              <input type="range" id="pen-up" min="1" max="30" step="0.5" value="5" class="slider">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Path Optimization -->
+      <div class="accordion-section open">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Path Optimization
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="opt-row">
+              <div class="field-check">
+                <input type="checkbox" id="opt-linemerge" checked>
+                <label for="opt-linemerge">Line merge</label>
+              </div>
+              <div class="field slider-field" id="opt-linemerge-slider">
+                <label>tolerance <span class="slider-val" id="opt-linemerge-val">0.05</span> mm</label>
+                <input type="range" id="opt-linemerge-tol" min="0.01" max="2" step="0.01" value="0.05" class="slider">
+              </div>
+            </div>
+            <div class="opt-row">
+              <div class="field-check">
+                <input type="checkbox" id="opt-linesimplify" checked>
+                <label for="opt-linesimplify">Line simplify</label>
+              </div>
+              <div class="field slider-field" id="opt-linesimplify-slider">
+                <label>tolerance <span class="slider-val" id="opt-linesimplify-val">0.05</span> mm</label>
+                <input type="range" id="opt-linesimplify-tol" min="0.01" max="1" step="0.01" value="0.05" class="slider">
+              </div>
+            </div>
+            <div class="opt-row">
+              <div class="field-check">
+                <input type="checkbox" id="opt-linesort" checked>
+                <label for="opt-linesort">Line sort</label>
+              </div>
+            </div>
+            <div class="opt-row">
+              <div class="field-check">
+                <input type="checkbox" id="opt-reloop" checked>
+                <label for="opt-reloop">Reloop</label>
+              </div>
+              <div class="field slider-field" id="opt-reloop-slider">
+                <label>tolerance <span class="slider-val" id="opt-reloop-val">0.05</span> mm</label>
+                <input type="range" id="opt-reloop-tol" min="0.01" max="2" step="0.01" value="0.05" class="slider">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced: G-code Templates -->
+      <div class="accordion-section">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Advanced: G-code Templates
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="field">
+              <label>segment_first (pen down + move to start)</label>
+              <textarea id="cfg-segment_first" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label>segment (draw line to point)</label>
+              <textarea id="cfg-segment" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label>segment_last (optional)</label>
+              <textarea id="cfg-segment_last" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label>document_start</label>
+              <textarea id="cfg-document_start" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label>document_end</label>
+              <textarea id="cfg-document_end" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced: Layer & Line Templates -->
+      <div class="accordion-section">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Advanced: Layer &amp; Line
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="field">
+              <label>layer_start</label>
+              <textarea id="cfg-layer_start" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label>layer_end</label>
+              <textarea id="cfg-layer_end" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label>layer_join</label>
+              <textarea id="cfg-layer_join" rows="1"></textarea>
+            </div>
+            <div class="field">
+              <label>line_start</label>
+              <textarea id="cfg-line_start" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label>line_end</label>
+              <textarea id="cfg-line_end" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label>line_join</label>
+              <textarea id="cfg-line_join" rows="1"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced: Transforms -->
+      <div class="accordion-section">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Advanced: Transforms &amp; Units
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content">
+            <div class="field">
+              <label>Unit</label>
+              <select id="cfg-unit">
+                <option value="mm" selected>mm</option>
+                <option value="cm">cm</option>
+                <option value="in">in</option>
+                <option value="px">px</option>
+                <option value="pt">pt</option>
+                <option value="pc">pc</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>scale_x</label>
+                <input type="number" id="cfg-scale_x" value="1.0" step="0.1">
+              </div>
+              <div class="field">
+                <label>scale_y</label>
+                <input type="number" id="cfg-scale_y" value="1.0" step="0.1">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>offset_x</label>
+                <input type="number" id="cfg-offset_x" value="0" step="0.5">
+              </div>
+              <div class="field">
+                <label>offset_y</label>
+                <input type="number" id="cfg-offset_y" value="0" step="0.5">
+              </div>
+            </div>
+            <div class="field-check">
+              <input type="checkbox" id="cfg-invert_x">
+              <label for="cfg-invert_x">invert_x (mirror X around geometry center)</label>
+            </div>
+            <div class="field-check">
+              <input type="checkbox" id="cfg-invert_y">
+              <label for="cfg-invert_y">invert_y (mirror Y around geometry center)</label>
+            </div>
+            <div class="field-check">
+              <input type="checkbox" id="cfg-horizontal_flip">
+              <label for="cfg-horizontal_flip">horizontal_flip (mirror X around page center)</label>
+            </div>
+            <div class="field-check">
+              <input type="checkbox" id="cfg-vertical_flip">
+              <label for="cfg-vertical_flip">vertical_flip (mirror Y around page center)</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Template Variables Reference -->
+      <div class="accordion-section">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          Template Variables Reference
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-content" id="template-vars-ref">
+            <!-- populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <div style="padding: 12px;">
+        <button class="btn btn-primary" id="btn-generate" disabled>
+          Generate G-code
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ SVG PREVIEW ============ -->
+  <div class="panel">
+    <div class="panel-header">
+      SVG Preview
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <div class="svg-preview empty" id="svg-preview">
+        Upload an SVG to preview
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3D VIEWER ============ -->
+  <div class="panel">
+    <div class="panel-header">
+      Toolpath 3D View
+      <div style="display:flex;gap:4px;align-items:center;">
+        <select id="controls-preset" class="controls-select" title="Camera control style">
+          <option value="blender">Blender</option>
+          <option value="touchpad">Touchpad</option>
+          <option value="cad">CAD</option>
+          <option value="default">Default</option>
+        </select>
+        <button class="btn btn-sm btn-ghost" id="btn-reset-camera" title="Reset camera">Reset</button>
+      </div>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <div class="viewer-container" id="viewer-container">
+        <canvas id="viewer-canvas"></canvas>
+        <div class="viewer-info" id="viewer-info">Generate G-code to see toolpath</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ G-CODE OUTPUT ============ -->
+  <div class="panel" style="grid-column: 2 / 4;">
+    <div class="panel-header">
+      G-code Output
+      <div>
+        <button class="btn btn-sm btn-ghost" id="btn-copy-gcode">Copy</button>
+        <button class="btn btn-sm btn-ghost" id="btn-download-gcode">Download .gcode</button>
+      </div>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <textarea class="gcode-output" id="gcode-output" readonly placeholder="G-code will appear here after generation..."></textarea>
+    </div>
+  </div>
+
+</div>
+
+<div class="status-bar">
+  <span id="status-text">Ready</span>
+  <span id="status-stats"></span>
+</div>
+
+<!-- Three.js from CDN -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="/static/app.js"></script>
+
+</body>
+</html>
