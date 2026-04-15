@@ -21,6 +21,7 @@ COPY --from=builder /app/pyproject.toml /app/uv.lock ./
 
 # Copy application code (changes here don't rebuild deps)
 COPY server.py ./
+COPY preprocessing.py ./
 COPY static/ ./static/
 
 # Non-root user

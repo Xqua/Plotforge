@@ -1,4 +1,5 @@
 import "./js/ui.js";
+import "./js/preprocess.js";
 import "./js/upload.js";
 import "./js/generate.js";
 import "./js/cncjs.js";
