@@ -14,7 +14,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from preprocessing import router as preprocess_router
+
 app = FastAPI(title="PlotForge")
+app.include_router(preprocess_router, prefix="/api/preprocess")
 
 # ---------------------------------------------------------------------------
 # Helpers

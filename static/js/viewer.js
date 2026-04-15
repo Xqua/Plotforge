@@ -240,7 +240,7 @@ function parseGcode(gcode) {
       continue;
     }
 
-    const gMatch = line.match(/^G([01])\b/i);
+    const gMatch = line.match(/^G0?([01])\b/i);
     if (!gMatch) continue;
 
     const isRapid = gMatch[1] === "0";

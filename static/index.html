@@ -28,9 +28,10 @@
 
       <!-- Upload -->
       <div class="upload-zone" id="upload-zone">
-        <p>Drop SVG here or click to upload</p>
+        <p>Drop SVG or image here, or click to upload</p>
+        <p class="upload-hint">Accepted: SVG, PNG, JPG, WEBP, BMP, TIFF</p>
         <div class="filename" id="upload-filename"></div>
-        <input type="file" id="file-input" accept=".svg" hidden>
+        <input type="file" id="file-input" accept=".svg,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" hidden>
       </div>
 
       <!-- Profile Preset -->
@@ -373,6 +374,181 @@
 <div class="status-bar">
   <span id="status-text">Ready</span>
   <span id="status-stats"></span>
+</div>
+
+<!-- ============ RASTER PREPROCESSING WIZARD ============ -->
+<div class="preprocess-wizard hidden" id="preprocess-wizard">
+  <div class="wizard-panel">
+    <div class="wizard-header">
+      <div class="wizard-steps">
+        <span class="wizard-step active" data-step="1">1. Grayscale</span>
+        <span class="wizard-step" data-step="2">2. Contours</span>
+        <span class="wizard-step" data-step="3">3. Vectorize</span>
+      </div>
+      <button class="btn btn-sm btn-ghost wizard-close" id="wizard-cancel" title="Cancel">&times;</button>
+    </div>
+    <div class="wizard-progress hidden" id="wizard-progress">
+      <div class="wizard-progress-label" id="wizard-progress-label">Isolating subject&hellip;</div>
+      <div class="wizard-progress-bar"><div class="wizard-progress-fill"></div></div>
+    </div>
+
+    <!-- Step 1: grayscale + resize -->
+    <div class="wizard-body" data-step="1">
+      <div class="wizard-preview-wrap">
+        <img id="wizard-gray-preview" alt="Grayscale preview">
+      </div>
+      <div class="wizard-controls">
+        <h3>Resolution</h3>
+        <p class="wizard-help">
+          The longest side of the image is resized before processing. Lower = faster and cleaner G-code. Higher = more detail but longer vectorization and more G-code lines.
+        </p>
+        <div class="field">
+          <label>Longest side <span class="slider-val" id="wizard-resize-val">720 px</span></label>
+          <input type="range" id="wizard-resize" min="360" max="2160" step="120" value="720" class="slider">
+        </div>
+        <div class="resize-warning hidden" id="wizard-resize-warn">
+          &#9888; High resolution: vectorization will be slower and the G-code will have many more moves.
+        </div>
+
+        <h3 style="margin-top:14px;">Background isolation</h3>
+        <p class="wizard-help">
+          Remove or blur the background using <code>rembg</code>. Good for portraits or objects on busy scenes. First run downloads the model (~170&nbsp;MB).
+        </p>
+        <div class="field">
+          <label>Mode</label>
+          <select id="wizard-bg-mode">
+            <option value="none" selected>None (keep original)</option>
+            <option value="white">Replace background with white</option>
+            <option value="blur">Blur background</option>
+          </select>
+        </div>
+        <div class="field hidden" id="wizard-bg-blur-wrap">
+          <label>Blur radius <span class="slider-val" id="wizard-bg-blur-val">15</span> px</label>
+          <input type="range" id="wizard-bg-blur" min="1" max="60" step="1" value="15" class="slider">
+        </div>
+
+        <div class="field-static">
+          <label>Original size</label>
+          <span id="wizard-original-dims" class="wizard-dim">—</span>
+        </div>
+        <div class="field-static">
+          <label>Processed size</label>
+          <span id="wizard-gray-dims" class="wizard-dim">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: 3 contour proposals -->
+    <div class="wizard-body hidden" data-step="2">
+      <div class="contours-grid">
+
+        <div class="contour-card selected" data-variant="canny_auto">
+          <div class="contour-card-title">Canny auto <span class="contour-card-hint">balanced</span></div>
+          <div class="contour-img-wrap"><img alt="Canny auto"></div>
+          <div class="contour-controls">
+            <label>sigma <span class="slider-val" data-key="sigma">0.33</span>
+              <input type="range" min="0.10" max="0.80" step="0.02" value="0.33" data-key="sigma">
+            </label>
+            <label>blur ksize <span class="slider-val" data-key="blur_ksize">5</span>
+              <input type="range" min="1" max="15" step="2" value="5" data-key="blur_ksize">
+            </label>
+            <label class="inline-check">
+              <input type="checkbox" data-key="invert" checked> invert (black on white)
+            </label>
+          </div>
+        </div>
+
+        <div class="contour-card" data-variant="canny_strong">
+          <div class="contour-card-title">Canny strong <span class="contour-card-hint">bold outlines</span></div>
+          <div class="contour-img-wrap"><img alt="Canny strong"></div>
+          <div class="contour-controls">
+            <label>low <span class="slider-val" data-key="low">100</span>
+              <input type="range" min="0" max="255" step="1" value="100" data-key="low">
+            </label>
+            <label>high <span class="slider-val" data-key="high">200</span>
+              <input type="range" min="0" max="255" step="1" value="200" data-key="high">
+            </label>
+            <label>close ksize <span class="slider-val" data-key="morph_close_ksize">3</span>
+              <input type="range" min="0" max="9" step="1" value="3" data-key="morph_close_ksize">
+            </label>
+            <label>blur ksize <span class="slider-val" data-key="blur_ksize">5</span>
+              <input type="range" min="1" max="15" step="2" value="5" data-key="blur_ksize">
+            </label>
+            <label class="inline-check">
+              <input type="checkbox" data-key="invert" checked> invert
+            </label>
+          </div>
+        </div>
+
+        <div class="contour-card" data-variant="adaptive">
+          <div class="contour-card-title">Adaptive threshold <span class="contour-card-hint">sketch / texture</span></div>
+          <div class="contour-img-wrap"><img alt="Adaptive threshold"></div>
+          <div class="contour-controls">
+            <label>block size <span class="slider-val" data-key="block_size">11</span>
+              <input type="range" min="3" max="51" step="2" value="11" data-key="block_size">
+            </label>
+            <label>C <span class="slider-val" data-key="c_value">2</span>
+              <input type="range" min="-10" max="20" step="1" value="2" data-key="c_value">
+            </label>
+            <label>blur ksize <span class="slider-val" data-key="blur_ksize">5</span>
+              <input type="range" min="1" max="15" step="2" value="5" data-key="blur_ksize">
+            </label>
+            <label class="inline-check">
+              <input type="checkbox" data-key="invert" checked> invert
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Step 3: vectorize preview + vtracer params -->
+    <div class="wizard-body hidden" data-step="3">
+      <div class="wizard-preview-wrap">
+        <div id="wizard-svg-preview" class="wizard-svg-preview"></div>
+      </div>
+      <div class="wizard-controls" id="wizard-vectorize-controls">
+        <h3>Vectorizer (vtracer)</h3>
+        <div class="field-static">
+          <label>Paths</label>
+          <span id="wizard-path-count" class="wizard-dim">—</span>
+        </div>
+        <div class="field">
+          <label>filter_speckle <span class="slider-val" data-key="filter_speckle">4</span></label>
+          <input type="range" min="0" max="32" step="1" value="4" data-key="filter_speckle">
+        </div>
+        <div class="field">
+          <label>corner_threshold <span class="slider-val" data-key="corner_threshold">60</span></label>
+          <input type="range" min="0" max="180" step="1" value="60" data-key="corner_threshold">
+        </div>
+        <div class="field">
+          <label>length_threshold <span class="slider-val" data-key="length_threshold">4.0</span></label>
+          <input type="range" min="3.5" max="10" step="0.1" value="4.0" data-key="length_threshold">
+        </div>
+        <div class="field">
+          <label>splice_threshold <span class="slider-val" data-key="splice_threshold">45</span></label>
+          <input type="range" min="0" max="180" step="1" value="45" data-key="splice_threshold">
+        </div>
+        <div class="field">
+          <label>path_precision <span class="slider-val" data-key="path_precision">3</span></label>
+          <input type="range" min="0" max="10" step="1" value="3" data-key="path_precision">
+        </div>
+        <div class="field">
+          <label>Mode</label>
+          <select data-key="mode">
+            <option value="spline" selected>spline</option>
+            <option value="polygon">polygon</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn btn-ghost hidden" id="wizard-prev">&larr; Previous</button>
+      <button class="btn btn-primary" id="wizard-next">Next &rarr;</button>
+      <button class="btn btn-primary hidden" id="wizard-confirm">Use this SVG</button>
+    </div>
+  </div>
 </div>
 
 <!-- Three.js from CDN -->
